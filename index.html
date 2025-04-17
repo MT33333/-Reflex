@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>🎯 Jeu de Réflexe - Chrono & Challenge</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      user-select: none;
+      transition: background-color 0.5s ease;
+    }
+
+    h1 {
+      font-size: 2.5em;
+      margin: 10px;
+    }
+
+    #message, #modeSelector {
+      font-size: 1.3em;
+      margin: 10px;
+    }
+
+    #stats, #timer, #highscores {
+      font-size: 1em;
+      margin: 5px;
+    }
+
+    #restartBtn, .modeBtn {
+      padding: 10px 20px;
+      font-size: 1.1em;
+      border: none;
+      margin: 10px;
+      background: #3498db;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    #restartBtn:hover, .modeBtn:hover {
+      background: #2980b9;
+    }
+
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 2em;
+      }
+      #message, #stats, #timer, #highscores {
+        font-size: 1em;
+      }
+      #restartBtn, .modeBtn {
+        font-size: 1em;
+        padding: 8px 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>🎯 Jeu de Réflexe</h1>
+  <div id="modeSelector">
+    Choisis un mode :
+    <button class="modeBtn" onclick="selectMode('chrono')">⏱ Mode Chrono</button>
+    <button class="modeBtn" onclick="selectMode('challenge')">🎯 Mode Challenge</button>
+  </div>
+  <div id="message">Clique quand l'écran change de couleur mais méfies toi du bleu!!!...</div>
+  <div id="timer"></div>
+  <div id="stats">
+    Niveau : <span id="level">1</span> |
+    Vies : <span id="lives">3</span> ❤️ |
+    Score : <span id="score">0</span> ⭐
+  </div>
+  <div id="highscores">🏆 Top Scores : <span id="scoreList"></span></div>
+  <button id="restartBtn" onclick="resetGame()">Rejouer 🔁</button>
+
+  <script>
+    const colors = ['#2ecc71', '#3498db', '#9b59b6', '#f1c40f', '#e67e22']; // BLEU = piège
+    const challengeGoal = 3000;
+    const chronoTime = 60;
+
+    let hasStarted = false;
+    let ready = false;
+    let mode = '';
+    let gameOver = false;
+    let startTime;
+    let timeout;
+    let lives = 3;
+    let level = 1;
+    let score = 0;
+    let currentColor = '';
+    let clicksAllowed = false;
+    let highscores = JSON.parse(localStorage.getItem("highscores") || "[]");
+    let timerInterval, timeLeft;
+
+    const message = document.getElementById("message");
+    const levelDisplay = document.getElementById("level");
+    const livesDisplay = document.getElementById("lives");
+    const scoreDisplay = document.getElementById("score");
+    const restartBtn = document.getElementById("restartBtn");
+    const modeSelector = document.getElementById("modeSelector");
+    const timer = document.getElementById("timer");
+    const scoreList = document.getElementById("scoreList");
+
+    function updateStats() {
+      levelDisplay.textContent = level;
+      livesDisplay.textContent = Math.max(0, lives);
+      scoreDisplay.textContent = score;
+    }
+
+    function selectMode(selected) {
+      mode = selected;
+      modeSelector.style.display = "none";
+      gameOver = false;
+      if (mode === "chrono") startChrono();
+      else startGame();
+      setupClickHandler(); // Active les clics après délai
+    }
+
+    function startChrono() {
+      timeLeft = chronoTime;
+      timer.textContent = `⏱ Temps restant : ${timeLeft}s`;
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        timer.textContent = `⏱ Temps restant : ${timeLeft}s`;
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          endGame();
+        }
+      }, 1000);
+      startGame();
+    }
+
+    function startGame() {
+      if (gameOver) return;
+      hasStarted = true;
+      ready = false;
+      document.body.style.backgroundColor = "#e74c3c";
+      message.textContent = "Prépare-toi...";
+
+      let delay = 2000;
+      if (mode === "challenge") {
+        delay = Math.max(3000 - level * 100, 500);
+      } else if (mode === "chrono") {
+        delay = Math.floor(Math.random() * 500) + 400;
+      }
+
+      timeout = setTimeout(() => {
+        ready = true;
+        startTime = new Date().getTime();
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        currentColor = color;
+        document.body.style.backgroundColor = color;
+
+        if (color === '#3498db') {
+          message.textContent = "💣 Piège BLEU ! Ne clique pas !";
+          setTimeout(() => {
+            if (!hasStarted || gameOver) return;
+            message.textContent = "✔ Bien joué, tu n’as pas cliqué !";
+            level++;
+            updateStats();
+            hasStarted = false;
+            setTimeout(startGame, 800);
+          }, 1000);
+        } else {
+          message.textContent = "Clique maintenant !";
+        }
+      }, delay);
+    }
+
+    function resetGame() {
+      hasStarted = false;
+      ready = false;
+      gameOver = false;
+      lives = 3;
+      level = 1;
+      score = 0;
+      mode = '';
+      clearInterval(timerInterval);
+      timer.textContent = '';
+      message.textContent = "Clique quand l'écran change de couleur...";
+      restartBtn.style.display = "none";
+      modeSelector.style.display = "block";
+      updateStats();
+      clicksAllowed = false;
+    }
+
+    function endGame() {
+      gameOver = true;
+      message.textContent = `Fin du jeu ! Score : ${score}`;
+      restartBtn.style.display = "inline-block";
+      clearInterval(timerInterval);
+      clearTimeout(timeout);
+      if (score > 0) {
+        highscores.push(score);
+        highscores = highscores.sort((a, b) => b - a).slice(0, 5);
+        localStorage.setItem("highscores", JSON.stringify(highscores));
+        renderHighscores();
+      }
+    }
+
+    function renderHighscores() {
+      scoreList.textContent = highscores.join(" | ");
+    }
+
+    function setupClickHandler() {
+      clicksAllowed = false;
+      setTimeout(() => {
+        clicksAllowed = true;
+      }, 500); // délai pour ignorer le clic sur bouton
+
+      document.body.addEventListener("click", handleClick);
+    }
+
+    function handleClick() {
+      if (!clicksAllowed || !hasStarted || gameOver || mode === '') return;
+
+      if (!ready) {
+        lives = Math.max(0, lives - 1);
+        score = Math.max(0, score - 200);
+
+        document.body.style.backgroundColor = "#ff0000";
+        setTimeout(() => {
+          document.body.style.backgroundColor = "#e74c3c";
+        }, 150);
+
+        message.textContent = "⛔ Tu as cliqué trop tôt désolé";
+        updateStats();
+        hasStarted = false;
+        clearTimeout(timeout);
+
+        if (lives <= 0) {
+          endGame();
+          return;
+        }
+
+        setTimeout(startGame, 1000);
+        return;
+      }
+
+      if (currentColor === '#3498db') {
+        lives = Math.max(0, lives - 1);
+        message.textContent = "💥 Tu as cliqué sur le piège BLEU !";
+        updateStats();
+        if (lives <= 0) {
+          endGame();
+          return;
+        }
+        hasStarted = false;
+        setTimeout(startGame, 1000);
+        return;
+      }
+
+      const reactionTime = new Date().getTime() - startTime;
+      score += Math.max(1000 - reactionTime, 100);
+      level++;
+      updateStats();
+
+      if (mode === "challenge" && score >= challengeGoal) {
+        message.textContent = `🎯 Objectif atteint ! Score : ${score}`;
+        endGame();
+        return;
+      }
+
+      hasStarted = false;
+      setTimeout(startGame, 800);
+    }
+
+    renderHighscores();
+    updateStats();
+  </script>
+</body>
+</html>
